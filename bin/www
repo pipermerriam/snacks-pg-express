@@ -3,7 +3,7 @@
 /**
  * Module dependencies.
  */
-
+console.log("IN THE WWW");
 var app = require('../app');
 var debug = require('debug')('snacks-pg:server');
 var http = require('http');

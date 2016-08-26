@@ -112,3 +112,136 @@
   * delete public directory
   * delete views directory
 1. Commit new changes
+
+#### Server restarts on file changes
+
+1. globally install nodemon `$ npm install -g nodemon`
+1. update package.json start script to be: `"nodemon ./bin/www"`
+
+#### User can get a list of snacks
+
+1. Create a new spec file `spec/snacks.spec.js` with the following content:
+
+  ```js
+  var request = require('request');
+  var app = require('../app.js');
+
+  var baseUrl = 'http://localhost:3000/'
+
+  describe('Snacks', function() {
+    it('returns status code 200', function(done) {
+      request.get(baseUrl + 'snacks', function(error, response, body) {
+        expect(response.statusCode).toBe(200);
+        done();
+      });
+    });
+
+    it('returns empty list of snacks', function(done) {
+      request.get(baseUrl + 'snacks', function(error, response, body) {
+        expect(body).toBe([]);
+        done();
+      });
+    });
+
+  });
+  ```
+
+1. `$ createdb snacks_test`
+1. `$ knex migrate:latest --env test`
+1. In app.js, change users to snacks in two lines (four places):
+
+  ```js
+  var snacks = require('./routes/snacks');
+  // ...
+  app.use('/snacks', snacks);
+  ```
+
+1. `$ mv routes/users.js routes/snacks.js`
+1. In `routes/snacks.js`, remove comment and change `res.send` to `res.json`
+1. Install `pg` and `knex`
+
+  ```
+  npm install --save pg knex
+  ```
+
+1. `$ knex init` and replace the contents with:
+
+  ```js
+  module.exports = {
+
+    development: {
+      client: 'pg',
+      connection: 'postgres://localhost/snacks_development'
+    },
+
+    test: {
+      client: 'pg',
+      connection: 'postgres://localhost/snacks_test'
+    },
+
+    production: {
+      client: 'pg',
+      connection: process.env.DATABASE_URL
+    }
+
+  };
+  ```
+
+1. To app.js, add `var knex = require('./db/knex');`
+1. Add `/db/knex.js` with the following content:
+
+  ```js
+  var environment = process.env.NODE_ENV || 'development';
+  var config = require('../knexfile.js')[environment];
+  module.exports = require('knex')(config);
+  ```
+
+1. change routes/snacks.js to use knex:
+
+  ```js
+  var express = require('express');
+  var router = express.Router();
+  var knex = require('knex')(require('../knexfile')[process.env.NODE_ENV || 'development']);
+
+  router.get('/', function(req, res, next) {
+    knex('snacks').then(function (snacks) {
+      res.json(snacks);
+    })
+  });
+
+  module.exports = router;
+  ```
+
+1. `$ createdb snacks_development`
+1. `$ knex migrate:make snacks` and replace migration content with:
+
+  ```js
+  exports.up = function(knex, Promise) {
+    return knex.schema.createTable('snacks', (t) => {
+      t.increments();
+      t.string('name');
+      t.boolean('healthy');
+      t.integer('quantity');
+      t.float('ounces');
+      t.timestamps();
+    })
+  };
+
+  exports.down = function(knex, Promise) {
+    return knex.schema.dropTable('snacks');
+  };
+  ```
+
+1. migrate `$ knex migrate:latest`
+1. check out the empty collection of snacks at (http://localhost:3000/snacks)[http://localhost:3000/snacks]
+1. Add a snack to your development database:
+
+  ```
+  $ psql
+  > \c snacks_development
+  > SELECT * FROM snacks;
+  > INSERT INTO snacks(name, healthy, quantity, ounces, created_at, updated_at)
+  > VALUES ('beef jerky', true, 5, 3.5, current_timestamp, current_timestamp);
+  ```
+
+1. Check out your new colleciton of snacks! (http://localhost:3000/snacks)[http://localhost:3000/snacks]
